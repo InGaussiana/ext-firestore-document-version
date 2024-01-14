@@ -34,6 +34,15 @@ exports.manageDocumentVersions = functions
 
     // If creatting
     if (!data.before.exists) {
+      if (
+        after[gotoField] ||
+        after[undoField] ||
+        after[redoField] ||
+        (!enableRestore && after[restoreField])
+      ) {
+        return await db.doc(docPath).delete();
+      }
+
       if (after[restoreField]) {
         await restore(docPath);
       }
@@ -92,9 +101,6 @@ exports.manageDocumentVersions = functions
   });
 
 async function restore(docPath) {
-  if (!enableRestore) {
-    return await db.doc(docPath).delete();
-  }
   const data = await db.doc(`${historyPath}/${docPath}`).get();
   const restoreData = data?.data();
   if (restoreData) {
