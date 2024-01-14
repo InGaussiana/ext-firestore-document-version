@@ -93,7 +93,7 @@ exports.manageDocumentVersions = functions
       });
 
     // If it is an old version, need to delete saved histories
-    // after _version checkpoint
+    // after version checkpoint
     if (after[versionField]) {
       await deleteVersionsAfter(docPath, before[versionField], ">");
       await cleanFlags(docPath, [versionField]);
@@ -111,7 +111,7 @@ async function restore(docPath) {
 
 async function onDelete(docPath, before) {
   // If it is an old version, need to delete saved histories
-  // after _version checkpoint
+  // after version checkpoint
   if (enableRestore && before[versionField]) {
     await deleteVersionsAfter(docPath, before[versionField], ">=");
   }
@@ -123,7 +123,7 @@ async function onDelete(docPath, before) {
   await db.doc(`${historyPath}/${docPath}`).set(
     {
       ...before,
-      _version: FieldValue.delete(),
+      ...flagsWithValue(FieldValue.delete()),
     },
     { merge: true }
   );
@@ -146,7 +146,7 @@ async function goToVersion(docPath, after, context) {
 
   await db
     .doc(docPath)
-    .set({ ...versionData.data, _version: after[gotoField] });
+    .set({ ...versionData.data, [versionField]: after[gotoField] });
 }
 
 async function undo(docPath, after, context) {
@@ -172,10 +172,10 @@ async function undo(docPath, after, context) {
     await saveCurrentStateVersion(docPath, after, context);
   }
 
-  // Restoring old state and setting the _version flagF
+  // Restoring old state and setting the version flagF
   await db
     .doc(docPath)
-    .set({ ...oldRecord.get("data"), _version: oldRecord.id });
+    .set({ ...oldRecord.get("data"), [versionField]: oldRecord.id });
 }
 
 async function redo(docPath, after) {
@@ -213,11 +213,7 @@ async function cleanFlags(
   docPath,
   flags = [undoField, redoField, restoreField, versionField]
 ) {
-  await db
-    .doc(docPath)
-    .update(
-      Object.fromEntries(flags.map((flag) => [flag, FieldValue.delete()]))
-    );
+  await db.doc(docPath).update(flagsWithValue(FieldValue.delete(), flags));
 }
 
 async function deleteVersionsAfter(docPath, version, comparator = ">") {
@@ -233,11 +229,21 @@ async function saveCurrentStateVersion(docPath, after, context) {
   // Save current document state before undo, so last change doesn't get lost
   await db.doc(`${historyPath}/${docPath}/versions/${context.timestamp}`).set(
     {
-      data: { ...after, undo: FieldValue.delete(), goto: FieldValue.delete() },
+      data: {
+        ...after,
+        ...flagsWithValue(FieldValue.delete()),
+      },
       date: new Date(context.timestamp),
       last: true, // mark as last
     },
     // Just to enable deleting of goto field, really doesnt matter cause it doesnt exists
     { merge: true }
   );
+}
+
+function flagsWithValue(
+  value,
+  flags = [undoField, redoField, restoreField, versionField]
+) {
+  return Object.fromEntries(flags.map((flag) => [flag, value]));
 }
