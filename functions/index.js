@@ -211,7 +211,7 @@ async function redo(docPath, after) {
 
 async function cleanFlags(
   docPath,
-  flags = [undoField, redoField, restoreField, versionField]
+  flags = [undoField, redoField, gotoField, restoreField, versionField]
 ) {
   await db.doc(docPath).update(flagsWithValue(FieldValue.delete(), flags));
 }
@@ -243,7 +243,7 @@ async function saveCurrentStateVersion(docPath, after, context) {
 
 function flagsWithValue(
   value,
-  flags = [undoField, redoField, restoreField, versionField]
+  flags = [undoField, redoField, gotoField, restoreField, versionField]
 ) {
   return Object.fromEntries(flags.map((flag) => [flag, value]));
 }
