@@ -9,6 +9,7 @@ const docPath = `${process.env.COLLECTION}/{documentId}`;
 const enableRestore = process.env.ENABLE_RESTORE ?? true;
 const historyPath = `${process.env.HISTORY_COLLECTION ?? "history"}/database`;
 const restoreField = process.env.RESTORE_FIELD ?? "restore";
+const gotoField = process.env.GOTO_FIELD ?? "goto";
 const undoField = process.env.UNDO_FIELD ?? "undo";
 const redoField = process.env.REDO_FIELD ?? "redo";
 const versionField = process.env.VERSION_FIELD ?? "_version";
@@ -50,12 +51,18 @@ exports.manageDocumentVersions = functions
 
     // If we are cleaning flags
     if (
+      before[gotoField] ||
       before[undoField] ||
       before[redoField] ||
       before[restoreField] ||
       (before[versionField] && !after[versionField])
     ) {
       return;
+    }
+
+    // If going to especific version
+    if (after[gotoField]) {
+      return await goToVersion(docPath, after, context);
     }
 
     // If undoing change
@@ -87,8 +94,11 @@ exports.manageDocumentVersions = functions
 async function restore(docPath) {
   if (!enableRestore) return;
   const data = await db.doc(`${historyPath}/${docPath}`).get();
-  await db.doc(docPath).set(data.data());
-  await data.ref.delete();
+  const restoreData = data?.data();
+  if (restoreData) {
+    await db.doc(docPath).set(restoreData);
+    await data.ref.delete();
+  }
 }
 
 async function onDelete(docPath, before) {
@@ -111,6 +121,26 @@ async function onDelete(docPath, before) {
   );
 }
 
+async function goToVersion(docPath, after, context) {
+  const data = await db
+    .doc(`${historyPath}/${docPath}/versions/${after[gotoField]}`)
+    .get();
+
+  const versionData = data?.data();
+
+  if (!versionData) {
+    return;
+  }
+
+  if (!after[versionField]) {
+    await saveCurrentStateVersion(docPath, after, context);
+  }
+
+  await db
+    .doc(docPath)
+    .set({ ...versionData.data, _version: after[gotoField] });
+}
+
 async function undo(docPath, after, context) {
   let query = db.collection(`${historyPath}/${docPath}/versions`);
   // If actual version can redo
@@ -123,7 +153,7 @@ async function undo(docPath, after, context) {
   const last = await query.get();
 
   // If can't undo
-  if (!last.docs.length) {
+  if (!last?.docs.length) {
     return await cleanFlags(docPath, [undoField]);
   }
 
@@ -131,15 +161,7 @@ async function undo(docPath, after, context) {
 
   // If undoing from last change
   if (!after[versionField]) {
-    // Save current document state before undo, so last change doesn't get lost
-    await db.doc(`${historyPath}/${docPath}/versions/${context.timestamp}`).set(
-      {
-        data: { ...after, undo: FieldValue.delete() },
-        date: new Date(context.timestamp),
-        last: true, // mark as last
-      },
-      { merge: true } // Just to enable deleting of undo
-    );
+    await saveCurrentStateVersion(docPath, after, context);
   }
 
   // Restoring old state and setting the _version flagF
@@ -163,7 +185,7 @@ async function redo(docPath, after) {
     .get();
 
   // If can't redo
-  if (!next.docs.length) {
+  if (!next?.docs.length) {
     return await cleanFlags(docPath, [redoField, versionField]);
   }
 
@@ -196,5 +218,18 @@ async function deleteVersionsAfter(docPath, version, comparator = ">") {
     .where("date", comparator, new Date(version))
     .get();
 
-  versionsOverwrited.forEach((d) => d.ref.delete());
+  versionsOverwrited?.forEach((d) => d.ref.delete());
+}
+
+async function saveCurrentStateVersion(docPath, after, context) {
+  // Save current document state before undo, so last change doesn't get lost
+  await db.doc(`${historyPath}/${docPath}/versions/${context.timestamp}`).set(
+    {
+      data: { ...after, undo: FieldValue.delete(), goto: FieldValue.delete() },
+      date: new Date(context.timestamp),
+      last: true, // mark as last
+    },
+    // Just to enable deleting of goto field, really doesnt matter cause it doesnt exists
+    { merge: true }
+  );
 }
