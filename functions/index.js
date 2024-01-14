@@ -92,7 +92,9 @@ exports.manageDocumentVersions = functions
   });
 
 async function restore(docPath) {
-  if (!enableRestore) return;
+  if (!enableRestore) {
+    return await db.doc(docPath).delete();
+  }
   const data = await db.doc(`${historyPath}/${docPath}`).get();
   const restoreData = data?.data();
   if (restoreData) {
@@ -109,7 +111,7 @@ async function onDelete(docPath, before) {
   }
 
   if (!enableRestore) {
-    await deleteVersionsAfter(docPath, "0", ">=");
+    return await deleteVersionsAfter(docPath, "0", ">=");
   }
 
   await db.doc(`${historyPath}/${docPath}`).set(
