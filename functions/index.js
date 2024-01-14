@@ -17,10 +17,10 @@ exports.manageDocumentVersions = functions
       return;
     }
 
-    const path = context.resource.name.split("/(default)/documents/")[1];
+    const docPath = context.resource.name.split("/(default)/documents/")[1];
 
     // If change is on histories, abort
-    if (path.startsWith(`${historyPath}/`)) {
+    if (docPath.startsWith(`${historyPath}/`)) {
       return;
     }
 
@@ -30,18 +30,18 @@ exports.manageDocumentVersions = functions
     // If creatting
     if (!data.before.exists) {
       if (after.restore) {
-        await restore(path);
+        await restore(docPath);
       }
       return;
     }
 
     // If deleting
     if (!data.after.exists) {
-      return await onDelete(path, before);
+      return await onDelete(docPath, before);
     }
 
     if (after.restore) {
-      return await cleanFlags(path, ["restore"]);
+      return await cleanFlags(docPath, ["restore"]);
     }
 
     // If we are cleaning flags
@@ -56,47 +56,49 @@ exports.manageDocumentVersions = functions
 
     // If undoing change
     if (after.undo) {
-      return await undo(path, after, context);
+      return await undo(docPath, after, context);
     }
 
     // If redoing change
     if (after.redo) {
-      return await redo(path, after);
+      return await redo(docPath, after);
     }
 
     // Save history when not undoing/redoing
-    await db.doc(`${historyPath}/${path}/versions/${context.timestamp}`).set({
-      data: before,
-      date: new Date(context.timestamp),
-    });
+    await db
+      .doc(`${historyPath}/${docPath}/versions/${context.timestamp}`)
+      .set({
+        data: before,
+        date: new Date(context.timestamp),
+      });
 
     // If it is an old version, need to delete saved histories
     // after _version checkpoint
     if (after._version) {
-      await deleteVersionsAfter(path, before._version, ">");
-      await cleanFlags(path, ["_version"]);
+      await deleteVersionsAfter(docPath, before._version, ">");
+      await cleanFlags(docPath, ["_version"]);
     }
   });
 
-async function restore(path) {
+async function restore(docPath) {
   if (!enableRestore) return;
-  const data = await db.doc(`${historyPath}/${path}`).get();
-  await db.doc(path).set(data.data());
+  const data = await db.doc(`${historyPath}/${docPath}`).get();
+  await db.doc(docPath).set(data.data());
   await data.ref.delete();
 }
 
-async function onDelete(path, before) {
+async function onDelete(docPath, before) {
   // If it is an old version, need to delete saved histories
   // after _version checkpoint
   if (enableRestore && before._version) {
-    await deleteVersionsAfter(path, before._version, ">=");
+    await deleteVersionsAfter(docPath, before._version, ">=");
   }
 
   if (!enableRestore) {
-    await deleteVersionsAfter(path, "0", ">=");
+    await deleteVersionsAfter(docPath, "0", ">=");
   }
 
-  await db.doc(`${historyPath}/${path}`).set(
+  await db.doc(`${historyPath}/${docPath}`).set(
     {
       ...before,
       _version: FieldValue.delete(),
@@ -105,8 +107,8 @@ async function onDelete(path, before) {
   );
 }
 
-async function undo(path, after, context) {
-  let query = db.collection(`${historyPath}/${path}/versions`);
+async function undo(docPath, after, context) {
+  let query = db.collection(`${historyPath}/${docPath}/versions`);
   // If actual version can redo
   if (after._version) {
     query = query.where("date", "<", new Date(after._version));
@@ -118,7 +120,7 @@ async function undo(path, after, context) {
 
   // If can't undo
   if (!last.docs.length) {
-    return await cleanFlags(path, ["undo"]);
+    return await cleanFlags(docPath, ["undo"]);
   }
 
   const oldRecord = last.docs[0];
@@ -126,7 +128,7 @@ async function undo(path, after, context) {
   // If undoing from last change
   if (!after._version) {
     // Save current document state before undo, so last change doesn't get lost
-    await db.doc(`${historyPath}/${path}/versions/${context.timestamp}`).set(
+    await db.doc(`${historyPath}/${docPath}/versions/${context.timestamp}`).set(
       {
         data: { ...after, undo: FieldValue.delete() },
         date: new Date(context.timestamp),
@@ -137,18 +139,20 @@ async function undo(path, after, context) {
   }
 
   // Restoring old state and setting the _version flagF
-  await db.doc(path).set({ ...oldRecord.get("data"), _version: oldRecord.id });
+  await db
+    .doc(docPath)
+    .set({ ...oldRecord.get("data"), _version: oldRecord.id });
 }
 
-async function redo(path, after) {
+async function redo(docPath, after) {
   // If there is no something to redo
   if (!after._version) {
-    return await cleanFlags(path, ["redo", "_version"]);
+    return await cleanFlags(docPath, ["redo", "_version"]);
   }
 
   // Get next version
   const next = await db
-    .collection(`${historyPath}/${path}/versions`)
+    .collection(`${historyPath}/${docPath}/versions`)
     .where("date", ">", new Date(after._version))
     .orderBy("date", "asc")
     .limit(1)
@@ -156,7 +160,7 @@ async function redo(path, after) {
 
   // If can't redo
   if (!next.docs.length) {
-    return await cleanFlags(path, ["redo", "_version"]);
+    return await cleanFlags(docPath, ["redo", "_version"]);
   }
 
   const newRecord = next.docs[0];
@@ -168,23 +172,23 @@ async function redo(path, after) {
     toSave._version = newRecord.id;
   }
 
-  await db.doc(path).set(toSave);
+  await db.doc(docPath).set(toSave);
 }
 
 async function cleanFlags(
-  docRef,
+  docPath,
   flags = ["undo", "redo", "restore", "_version"]
 ) {
   await db
-    .doc(docRef)
+    .doc(docPath)
     .update(
       Object.fromEntries(flags.map((flag) => [flag, FieldValue.delete()]))
     );
 }
 
-async function deleteVersionsAfter(path, version, comparator = ">") {
+async function deleteVersionsAfter(docPath, version, comparator = ">") {
   const versionsOverwrited = await db
-    .collection(`${historyPath}/${path}/versions`)
+    .collection(`${historyPath}/${docPath}/versions`)
     .where("date", comparator, new Date(version))
     .get();
 
