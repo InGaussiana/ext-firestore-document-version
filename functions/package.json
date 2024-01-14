@@ -1,6 +1,6 @@
 {
-  "name": "greet-the-world",
-  "description": "Greet the world",
+  "name": "firestore-document-versioning",
+  "description": "Creates firestore documents versions on any change. Enabling soft delete and recover",
   "main": "index.js",
   "dependencies": {
     "firebase-admin": "^11.5.0",

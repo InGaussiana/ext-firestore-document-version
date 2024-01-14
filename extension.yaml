@@ -2,19 +2,18 @@
 # https://firebase.google.com/docs/extensions/reference/extension-yaml
 
 # Identifier for your extension
-# TODO: Replace this with an descriptive name for your extension.
-name: greet-the-world  
-version: 0.0.1  # Follow semver versioning
-specVersion: v1beta  # Version of the Firebase Extensions specification
+name: firestore-document-versioning
+version: 0.0.1 # Follow semver versioning
+specVersion: v1beta # Version of the Firebase Extensions specification
 
 # Friendly display name for your extension (~3-5 words)
-displayName: Greet the world
+displayName: Firestore Document Versioning
 
 # Brief description of the task your extension performs (~1 sentence)
 description: >-
-  Sends the world a greeting.
+  Creates firestore documents versions on any change. Enabling soft delete and recover
 
-license: Apache-2.0  # https://spdx.org/licenses/
+license: Apache-2.0 # https://spdx.org/licenses/
 
 # Public URL for the source code of your extension.
 # TODO:  Replace this with your GitHub repo.
@@ -37,25 +36,41 @@ billingRequired: true
 # Learn more in the docs:
 # https://firebase.google.com/docs/extensions/reference/extension-yaml#resources-field
 resources:
-  - name: greetTheWorld
+  - name: manageDocumentVersions
     type: firebaseextensions.v1beta.function
     description: >-
-      HTTP request-triggered function that responds with a specified greeting message
+      Firestore-OnWrite-triggered function that creates the versions of documents
     properties:
-      # httpsTrigger is used for an HTTP triggered function.
-      httpsTrigger: {}
+      eventTrigger:
+        eventType: providers/cloud.firestore/eventTypes/document.write
+        resource: projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}/{documentId}
       runtime: "nodejs16"
 
 # In the `params` field, set up your extension's user-configured parameters.
 # Learn more in the docs:
 # https://firebase.google.com/docs/extensions/reference/extension-yaml#params-field
 params:
-  - param: GREETING
-    label: Greeting for the world
+  - param: COLLECTION
+    label: Collection path to versionate
     description: >-
-      What do you want to say to the world?
-      For example, Hello world? or What's up, world?
+      Collection path to versionate
     type: string
-    default: Hello
-    required: true
-    immutable: false
+    example: collection/{documentId}/subcollection
+    default: "{document=**}"
+    required: false
+  - param: ENABLE_RESTORE
+    label: Enable restore documents
+    description: >-
+      Keeps track of deleted documents versions and a copy of last document state (soft delete). Giving the possibility to restore deleted documents
+    type: boolean
+    example: true
+    default: true
+    required: false
+  - param: HISTORY_COLLECTION
+    label: History collection path
+    description: >-
+      Collection path where to save history data
+    type: string
+    example: history
+    default: history
+    required: false
