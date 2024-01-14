@@ -5,7 +5,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 admin.initializeApp();
 const db = admin.firestore();
 
-const docPath = `${process.env.COLLECTION}/{documentId}`;
+const collectionName = `${process.env.COLLECTION}/{documentId}`;
 const enableRestore = process.env.ENABLE_RESTORE ?? true;
 const historyPath = `${process.env.HISTORY_COLLECTION ?? "history"}/database`;
 const restoreField = process.env.RESTORE_FIELD ?? "restore";
@@ -16,7 +16,7 @@ const versionField = process.env.VERSION_FIELD ?? "_version";
 
 exports.manageDocumentVersions = functions
   .runWith({ failurePolicy: true })
-  .firestore.document(docPath)
+  .firestore.document(collectionName)
   .onWrite(async (data, context) => {
     if (!data) {
       return;
@@ -86,7 +86,11 @@ exports.manageDocumentVersions = functions
 
     // Save history when not undoing/redoing
     await db
-      .doc(`${historyPath}/${docPath}/versions/${context.timestamp}`)
+      .doc(
+        `${historyPath}/${toHistoryPath(docPath)}/versions_history/${
+          context.timestamp
+        }`
+      )
       .set({
         data: before,
         date: new Date(context.timestamp),
@@ -101,7 +105,7 @@ exports.manageDocumentVersions = functions
   });
 
 async function restore(docPath) {
-  const data = await db.doc(`${historyPath}/${docPath}`).get();
+  const data = await db.doc(`${historyPath}/${toHistoryPath(docPath)}`).get();
   const restoreData = data?.data();
   if (restoreData) {
     await db.doc(docPath).set(restoreData);
@@ -120,7 +124,7 @@ async function onDelete(docPath, before) {
     return await deleteVersionsAfter(docPath, "0", ">=");
   }
 
-  await db.doc(`${historyPath}/${docPath}`).set(
+  await db.doc(`${historyPath}/${toHistoryPath(docPath)}`).set(
     {
       ...before,
       ...flagsWithValue(FieldValue.delete()),
@@ -131,7 +135,11 @@ async function onDelete(docPath, before) {
 
 async function goToVersion(docPath, after, context) {
   const data = await db
-    .doc(`${historyPath}/${docPath}/versions/${after[gotoField]}`)
+    .doc(
+      `${historyPath}/${toHistoryPath(docPath)}/versions_history/${
+        after[gotoField]
+      }`
+    )
     .get();
 
   const versionData = data?.data();
@@ -150,7 +158,9 @@ async function goToVersion(docPath, after, context) {
 }
 
 async function undo(docPath, after, context) {
-  let query = db.collection(`${historyPath}/${docPath}/versions`);
+  let query = db.collection(
+    `${historyPath}/${toHistoryPath(docPath)}/versions_history`
+  );
   // If actual version can redo
   if (after[versionField]) {
     query = query.where("date", "<", new Date(after[versionField]));
@@ -186,7 +196,7 @@ async function redo(docPath, after) {
 
   // Get next version
   const next = await db
-    .collection(`${historyPath}/${docPath}/versions`)
+    .collection(`${historyPath}/${toHistoryPath(docPath)}/versions_history`)
     .where("date", ">", new Date(after[versionField]))
     .orderBy("date", "asc")
     .limit(1)
@@ -218,7 +228,7 @@ async function cleanFlags(
 
 async function deleteVersionsAfter(docPath, version, comparator = ">") {
   const versionsOverwrited = await db
-    .collection(`${historyPath}/${docPath}/versions`)
+    .collection(`${historyPath}/${toHistoryPath(docPath)}/versions_history`)
     .where("date", comparator, new Date(version))
     .get();
 
@@ -227,18 +237,24 @@ async function deleteVersionsAfter(docPath, version, comparator = ">") {
 
 async function saveCurrentStateVersion(docPath, after, context) {
   // Save current document state before undo, so last change doesn't get lost
-  await db.doc(`${historyPath}/${docPath}/versions/${context.timestamp}`).set(
-    {
-      data: {
-        ...after,
-        ...flagsWithValue(FieldValue.delete()),
+  await db
+    .doc(
+      `${historyPath}/${toHistoryPath(docPath)}/versions_history/${
+        context.timestamp
+      }`
+    )
+    .set(
+      {
+        data: {
+          ...after,
+          ...flagsWithValue(FieldValue.delete()),
+        },
+        date: new Date(context.timestamp),
+        last: true, // mark as last
       },
-      date: new Date(context.timestamp),
-      last: true, // mark as last
-    },
-    // Just to enable deleting of goto field, really doesnt matter cause it doesnt exists
-    { merge: true }
-  );
+      // Just to enable deleting of goto field, really doesnt matter cause it doesnt exists
+      { merge: true }
+    );
 }
 
 function flagsWithValue(
@@ -246,4 +262,11 @@ function flagsWithValue(
   flags = [undoField, redoField, gotoField, restoreField, versionField]
 ) {
   return Object.fromEntries(flags.map((flag) => [flag, value]));
+}
+
+function toHistoryPath(docPath) {
+  return docPath
+    .split("/")
+    .map((x, i) => (i % 2 != 0 ? x : `${x}_history`))
+    .join("/");
 }
