@@ -1,7 +1,7 @@
 const axios = require("axios");
 const chai = require("chai");
 
-describe("greet-the-world", () => {
+describe("document-version", () => {
   it("should respond with the configured greeting", async () => {
     const expected = "Hello World from greet-the-world";
 

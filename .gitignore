@@ -1,0 +1,5 @@
+integration-tests
+.env
+**/firebase.json
+functions/integration-tests/firebase.json
+backups
