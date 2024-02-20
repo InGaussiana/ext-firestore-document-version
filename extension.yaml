@@ -76,7 +76,7 @@ params:
   - param: IGNORE_FIELDS
     label: Ignore fields
     description: >-
-      Comma separated fields that won't trigger a new history version (nor will be saved on the version data)
+      Comma separated fields that won't trigger a new history version (nor will be saved on the version data). Nested fields are supported with parent.child syntax.
     type: string
     example: updated_at,created_at
     default:
@@ -110,8 +110,8 @@ params:
     description: >-
       Field used for redo version operation. This must be the only field in the document's update, in order to redo the change.
     type: string
-    example: _undo
-    default: _undo
+    example: _redo
+    default: _redo
     required: false
   - param: VERSION_FIELD
     label: Actual version field name
