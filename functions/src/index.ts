@@ -1,11 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import {
-  collectionName,
-  historyPath,
-  restoreField,
-  versionField,
-} from "./config";
+import { config } from "./config";
 import {
   isRestoring,
   isHistoryTransaction,
@@ -34,10 +29,10 @@ admin.initializeApp();
 
 exports.manageDocumentVersions = functions
   .runWith({ failurePolicy: true })
-  .firestore.document(collectionName)
+  .firestore.document(config.collectionName)
   .onWrite(async (data, context) => {
     // If changed document is a history record, abort
-    if (data.after.ref.path.startsWith(`${historyPath}/`)) {
+    if (data.after.ref.path.startsWith(`${config.historyPath}/`)) {
       return;
     }
 
@@ -60,7 +55,7 @@ exports.manageDocumentVersions = functions
       functions.logger.log(
         `RESTORE operation found on (${data.after.ref.path}) change. RESTORE operation is for creation only. ABORTING!`
       );
-      await cleanFlags(data.after, [restoreField]);
+      await cleanFlags(data.after, [config.restoreField]);
       return;
     }
 
@@ -79,7 +74,7 @@ exports.manageDocumentVersions = functions
       functions.logger.log(
         `Tracked fields on Document (${data.after.ref.path}) didn't change on update. ABORTING!`
       );
-      await cleanFlags(data.after, [restoreField]);
+      await cleanFlags(data.after, [config.restoreField]);
       return;
     }
 
@@ -131,8 +126,12 @@ exports.manageDocumentVersions = functions
         functions.logger.log(
           `Newer versions of (${data.after.ref.path}) will become unreachable, deleting them`
         );
-        await deleteVersions(data.after, data.before.get(versionField), ">");
-        await cleanFlags(data.after, [versionField]);
+        await deleteVersions(
+          data.after,
+          data.before.get(config.versionField),
+          ">"
+        );
+        await cleanFlags(data.after, [config.versionField]);
         functions.logger.log("DONE");
       } catch (error) {
         functions.logger.error(

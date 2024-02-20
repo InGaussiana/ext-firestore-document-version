@@ -3,35 +3,27 @@ import {
   DocumentSnapshot,
   FieldValue,
 } from "firebase-admin/firestore";
-import {
-  restoreField,
-  undoField,
-  redoField,
-  gotoField,
-  versionField,
-  historyPath,
-  ignoreFields,
-} from "./config";
+import { config } from "./config";
 import { logger } from "firebase-functions";
 
 export function isRestoring(document: DocumentSnapshot) {
-  return document.get(restoreField) !== undefined;
+  return document.get(config.restoreField) !== undefined;
 }
 
 export function isUndoing(document: DocumentSnapshot) {
-  return document.get(undoField) !== undefined;
+  return document.get(config.undoField) !== undefined;
 }
 
 export function isRedoing(document: DocumentSnapshot) {
-  return document.get(redoField) !== undefined;
+  return document.get(config.redoField) !== undefined;
 }
 
 export function isGoingTo(document: DocumentSnapshot) {
-  return document.get(gotoField) !== undefined;
+  return document.get(config.gotoField) !== undefined;
 }
 
 export function canRedo(document: DocumentSnapshot) {
-  return document.get(versionField) !== undefined;
+  return document.get(config.versionField) !== undefined;
 }
 
 export function isHistoryTransaction(document: DocumentSnapshot) {
@@ -44,7 +36,7 @@ export function isHistoryTransaction(document: DocumentSnapshot) {
 }
 
 export function getHistoryPath(document: DocumentSnapshot) {
-  return `${historyPath}/${document.ref.path
+  return `${config.historyPath}/${document.ref.path
     .split("/")
     .map((x, i) => (i % 2 != 0 ? x : `${x}_history`))
     .join("/")}`;
@@ -56,7 +48,13 @@ export function getHistoryPathVersion(document: DocumentSnapshot) {
 
 export async function cleanFlags(
   document: DocumentSnapshot,
-  flags = [undoField, redoField, gotoField, restoreField, versionField]
+  flags = [
+    config.undoField,
+    config.redoField,
+    config.gotoField,
+    config.restoreField,
+    config.versionField,
+  ]
 ) {
   try {
     logger.log(`Cleaning history change flags on (${document.ref.path})`);
@@ -72,7 +70,13 @@ export async function cleanFlags(
 }
 
 export function deletedHistoryFlags(
-  flags = [undoField, redoField, gotoField, restoreField, versionField],
+  flags = [
+    config.undoField,
+    config.redoField,
+    config.gotoField,
+    config.restoreField,
+    config.versionField,
+  ],
   value = FieldValue.delete()
 ) {
   return Object.fromEntries(flags.map((flag) => [flag, value]));
@@ -100,7 +104,7 @@ export function documentChanged(
 
 export function getVersionedFields(document: DocumentSnapshot) {
   const data: DocumentData = flattenObject(document.data());
-  const toIgnore = ignoreFields.split(",").map((x) => x.trim());
+  const toIgnore = config.ignoreFields.split(",").map((x) => x.trim());
   return Object.fromEntries(
     Object.entries(data).filter(([key]) => !toIgnore.includes(key))
   );
