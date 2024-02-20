@@ -15,6 +15,8 @@ import {
   isRedoing,
   getHistoryPathVersion,
   cleanFlags,
+  documentChanged,
+  getVersionedFields,
 } from "./utils";
 import {
   handleDocumentCreation,
@@ -28,7 +30,7 @@ import {
 admin.initializeApp();
 
 // TODO flatten
-// TODO save current version with all. And only save versions with changes
+// TODO save current version with all.
 
 exports.manageDocumentVersions = functions
   .runWith({ failurePolicy: true })
@@ -73,6 +75,14 @@ exports.manageDocumentVersions = functions
       return;
     }
 
+    if (!documentChanged(data.before, data.after)) {
+      functions.logger.log(
+        `Tracked fields on Document (${data.after.ref.path}) didn't change on update. ABORTING!`
+      );
+      await cleanFlags(data.after, [restoreField]);
+      return;
+    }
+
     // Handling history operations
 
     if (isGoingTo(data.after)) {
@@ -84,17 +94,13 @@ exports.manageDocumentVersions = functions
     }
 
     if (isUndoing(data.after)) {
-      functions.logger.log(
-        `UNDO operation found (${data.after.ref.path})`
-      );
+      functions.logger.log(`UNDO operation found (${data.after.ref.path})`);
       await undo(data.after, context);
       return;
     }
 
     if (isRedoing(data.after)) {
-      functions.logger.log(
-        `Redo operation found (${data.after.ref.path})`
-      );
+      functions.logger.log(`Redo operation found (${data.after.ref.path})`);
       await redo(data.after);
       return;
     }
@@ -106,7 +112,7 @@ exports.manageDocumentVersions = functions
         .firestore()
         .doc(`${getHistoryPathVersion(data.after)}/${context.timestamp}`)
         .set({
-          data: data.before.data(),
+          data: getVersionedFields(data.before),
           date: new Date(context.timestamp),
         });
 

@@ -1,4 +1,8 @@
-import { DocumentSnapshot, FieldValue } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  DocumentSnapshot,
+  FieldValue,
+} from "firebase-admin/firestore";
 import {
   restoreField,
   undoField,
@@ -6,6 +10,7 @@ import {
   gotoField,
   versionField,
   historyPath,
+  ignoreFields,
 } from "./config";
 import { logger } from "firebase-functions";
 
@@ -72,3 +77,48 @@ export function deletedHistoryFlags(
 ) {
   return Object.fromEntries(flags.map((flag) => [flag, value]));
 }
+
+export function documentChanged(
+  before: DocumentSnapshot,
+  after: DocumentSnapshot
+) {
+  const beforeData = getVersionedFields(before);
+  const afterData = getVersionedFields(after);
+
+  if (Object.entries(beforeData).length !== Object.entries(afterData).length) {
+    return true;
+  }
+
+  for (const key in Object.keys(beforeData)) {
+    if (beforeData[key] !== afterData[key]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function getVersionedFields(document: DocumentSnapshot) {
+  const data: DocumentData = flattenObject(document.data());
+  const toIgnore = ignoreFields.split(",").map((x) => x.trim());
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => !toIgnore.includes(key))
+  );
+}
+
+const flattenObject = (obj?: DocumentData, parentKey = "") => {
+  if (parentKey !== "") parentKey += ".";
+  let flattened: DocumentData = {};
+  Object.keys(obj ?? {}).forEach((key) => {
+    if (
+      typeof obj?.[key] === "object" &&
+      obj[key] !== null &&
+      !obj[key].toDate // Avoid flattening Firebase Timestamps
+    ) {
+      Object.assign(flattened, flattenObject(obj[key], parentKey + key));
+    } else {
+      flattened[parentKey + key] = obj?.[key];
+    }
+  });
+  return flattened;
+};

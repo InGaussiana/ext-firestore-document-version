@@ -3,7 +3,7 @@ export const enableRestore = process.env.ENABLE_RESTORE ?? true;
 export const historyPath = `${
   process.env.HISTORY_COLLECTION ?? "history"
 }/database`;
-// export const ignoreFields = "updated_at,image,created_at"; // TODO
+export const ignoreFields = process.env.IGNORE_FIELDS ?? "";
 export const restoreField = process.env.RESTORE_FIELD ?? "restore";
 export const gotoField = process.env.GOTO_FIELD ?? "goto";
 export const undoField = process.env.UNDO_FIELD ?? "undo";
