@@ -59,7 +59,7 @@ export async function cleanFlags(
   try {
     logger.log(`Cleaning history change flags on (${document.ref.path})`);
     await document.ref.update(deletedHistoryFlags(flags));
-    logger.log("DONE");
+    logger.log("CLEANING DONE");
   } catch (error) {
     logger.error(
       `ERROR cleaning history change flags on (${document.ref.path})`,

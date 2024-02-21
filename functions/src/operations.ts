@@ -17,6 +17,7 @@ import {
   cleanFlags,
   getVersionedFields,
   getIgnoredFields,
+  nestObject,
 } from "./utils";
 import { EventContext } from "firebase-functions";
 
@@ -77,7 +78,7 @@ export async function handleDocumentDeletion(
       { merge: true }
     );
 
-  logger.log("DONE");
+  logger.log("SAVE BACKUP DONE");
 }
 
 export async function restoreDocument(document: DocumentSnapshot) {
@@ -91,7 +92,7 @@ export async function restoreDocument(document: DocumentSnapshot) {
     const restoreData = restoreValue?.data();
     if (restoreData) {
       await document.ref.set(restoreData);
-      logger.log("DONE");
+      logger.log("RESTORE DONE");
       await restoreValue.ref.delete();
     } else {
       logger.log("No backup document found. ABORTING.");
@@ -144,11 +145,13 @@ export async function goToVersion(
       toSave[config.versionField] = document.get(config.gotoField);
     }
 
-    await document.ref.set({
-      ...toSave,
-      ...getIgnoredFields(document),
-    });
-    logger.log("DONE");
+    await document.ref.set(
+      nestObject({
+        ...toSave,
+        ...getIgnoredFields(document),
+      })
+    );
+    logger.log("GOTO DONE");
   } catch (error) {
     logger.error(
       `ERROR setting (${document.ref.path}) document version to ${document.get(
@@ -197,13 +200,15 @@ export async function undo(document: DocumentSnapshot, context: EventContext) {
     }
 
     // Restoring old state and setting the version flag
-    await document.ref.set({
-      ...oldRecord.get("data"),
-      ...getIgnoredFields(document),
-      [config.versionField]: oldRecord.id,
-    });
+    await document.ref.set(
+      nestObject({
+        ...oldRecord.get("data"),
+        ...getIgnoredFields(document),
+        [config.versionField]: oldRecord.id,
+      })
+    );
 
-    logger.log("DONE");
+    logger.log("UNDO DONE");
   } catch (error) {
     logger.error(
       `ERROR undoing change of document (${document.ref.path})`,
@@ -253,12 +258,14 @@ export async function redo(document: DocumentSnapshot) {
       toSave[config.versionField] = newRecord.id;
     }
 
-    await document.ref.set({
-      ...toSave,
-      ...getIgnoredFields(document),
-    });
+    await document.ref.set(
+      nestObject({
+        ...toSave,
+        ...getIgnoredFields(document),
+      })
+    );
 
-    logger.log("DONE");
+    logger.log("REDO DONE");
   } catch (error) {
     logger.error(
       `ERROR redoing change of document (${document.ref.path})`,
@@ -288,7 +295,7 @@ export async function deleteVersions(
       versionsOverwrited?.docs.map(async (d) => await d.ref.delete())
     );
 
-    logger.log("DONE");
+    logger.log("DELETE DONE");
   } catch (error) {
     logger.error(
       `ERROR deleting versions ${comparator} ${version} of document (${document.ref.path})`,
@@ -314,16 +321,16 @@ export async function saveCurrentStateVersion(
       .firestore()
       .doc(path)
       .set(
-        {
+        nestObject({
           data: { ...getVersionedFields(document), ...deletedHistoryFlags() },
           date: new Date(context.timestamp),
           last: true, // mark as last
-        },
+        }),
         // Need merge to enable deletion of flags
         { merge: true }
       );
 
-    logger.log("DONE");
+    logger.log("SAVE CURRENT DONE");
   } catch (error) {
     logger.error(
       `ERROR deleting version of document (${document.ref.path})`,

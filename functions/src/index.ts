@@ -108,12 +108,10 @@ exports.manageDocumentVersions = functions
           nestObject({
             data: getVersionedFields(data.before),
             date: new Date(context.timestamp),
-            test: new Date(context.timestamp),
-            shift: "TEST",
           })
         );
 
-      functions.logger.log("DONE");
+      functions.logger.log("SAVING NEW VERSION DONE");
     } catch (error) {
       functions.logger.error(
         `ERROR saving new version of (${data.after.ref.path})`,
@@ -134,7 +132,7 @@ exports.manageDocumentVersions = functions
           ">"
         );
         await cleanFlags(data.after, [config.versionField]);
-        functions.logger.log("DONE");
+        functions.logger.log("DELETE VERSIONS DONE");
       } catch (error) {
         functions.logger.error(
           `ERROR deleting unreachable versions of (${data.after.ref.path})`,
