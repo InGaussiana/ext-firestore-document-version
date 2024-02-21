@@ -1,25 +1,25 @@
 # See it in action
 
-Update any document and see the document version being created saved inside "[HISTORY_COLLECTION]/[DOCUMENT_PATH]".
+Update any document and see the document version being created saved inside ```${param:HISTORY_COLLECTION}/DOCUMENT_PATH```.
 
-Note: To avoid conflicts on .collectionGroup() queries, this extension appends \_history to the end of all collection & subcollection names on [DOCUMENT_PATH].
+Note: To avoid conflicts on .collectionGroup() queries, this extension appends \_history to the end of all collection & subcollection names on DOCUMENT_PATH.
 
 ### UNDO change:
 
 ```
-document.ref.update({ [UNDO_FIELD]: true });
+document.ref.update({ ${param:UNDO_FIELD}: true });
 ```
 
 ### REDO change:
 
 ```
-document.ref.update({ [REDO_FIELD]: true });
+document.ref.update({ ${param:REDO_FIELD}: true });
 ```
 
 ### GOTO version:
 
 ```
-document.ref.update({ [GOT_FIELD]: [VERSION_ID] });
+document.ref.update({ ${param:GOTO_FIELD}: "VERSION_TIMESTAMP_BASED_ID" });
 ```
 
 ### Restore deleted document:
@@ -28,7 +28,7 @@ Only works on document create
 
 ```
 await setDoc(doc(firestore, collectionName, id), {
-    [RESTORE_FIELD]: true
+    ${param:RESTORE_FIELD}: true
 });
 ```
 

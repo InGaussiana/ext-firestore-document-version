@@ -44,3 +44,13 @@ When you use Firebase Extensions, you're only charged for the underlying resourc
 **Cloud Functions:**
 
 * **manageDocumentVersions:** Firestore-OnWrite-triggered function that creates the versions of documents
+
+
+
+**Access Required**:
+
+
+
+This extension will operate with the following project IAM roles:
+
+* datastore.user (Reason: Allows the extension to write to Firestore.)
