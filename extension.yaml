@@ -11,12 +11,16 @@ displayName: Firestore Document Versioning
 
 # Brief description of the task your extension performs (~1 sentence)
 description: >-
-  Creates firestore documents versions on any change. Enabling soft delete and recover
+  Creates firestore documents versions on document writes. Supporting soft delete and recover
 
 license: Apache-2.0 # https://spdx.org/licenses/
 
+author:
+  authorName: Gaussiana
+url: https://github.com/InGaussiana
+
 # Public URL for the source code of your extension.
-sourceUrl: https://github.com/sinedie/ext-firestore-document-version
+sourceUrl: https://github.com/InGaussiana/ext-firestore-document-version
 
 # Specify whether a paid-tier billing plan is required to use your extension.
 # Learn more in the docs: https://firebase.google.com/docs/extensions/reference/extension-yaml#billing-required-field
@@ -50,7 +54,7 @@ resources:
 # https://firebase.google.com/docs/extensions/reference/extension-yaml#params-field
 params:
   - param: COLLECTION
-    label: Collection path to versionate
+    label: Collection path
     description: >-
       Collection path to versionate
     type: string
