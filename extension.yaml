@@ -73,9 +73,14 @@ params:
     label: Enable restore operation
     description: >-
       Enable keep track of deleted documents and its versions (like a soft delete). Giving the possibility to restore deleted documents
-    type: boolean
-    example: true
-    default: true
+    type: select
+    options:
+      - label: "true"
+        value: "true"
+      - label: "false"
+        value: "false"
+    example: "true"
+    default: "true"
     required: false
   - param: IGNORE_FIELDS
     label: Ignore fields
