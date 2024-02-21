@@ -16,6 +16,7 @@ import {
   getHistoryPathVersion,
   cleanFlags,
   getVersionedFields,
+  getIgnoredFields,
 } from "./utils";
 import { EventContext } from "firebase-functions";
 
@@ -66,11 +67,15 @@ export async function handleDocumentDeletion(
   logger.log(
     `Saving deleted document (${after.ref.path}) on "${getHistoryPath(after)}"`
   );
-  // Save last version of document (IMPORTANT: ALL fields!)
+  // Save last version of document (ALL fields)
   await admin
     .firestore()
     .doc(getHistoryPath(after))
-    .set({ ...before.data(), ...deletedHistoryFlags() });
+    .set(
+      { ...before.data(), ...deletedHistoryFlags() },
+      // Need merge to enable deletion of flags
+      { merge: true }
+    );
 
   logger.log("DONE");
 }
@@ -139,9 +144,9 @@ export async function goToVersion(
       toSave[config.versionField] = document.get(config.gotoField);
     }
 
-    await document.ref.update({
+    await document.ref.set({
       ...toSave,
-      ...deletedHistoryFlags([config.gotoField]),
+      ...getIgnoredFields(document),
     });
     logger.log("DONE");
   } catch (error) {
@@ -192,9 +197,9 @@ export async function undo(document: DocumentSnapshot, context: EventContext) {
     }
 
     // Restoring old state and setting the version flag
-    await document.ref.update({
+    await document.ref.set({
       ...oldRecord.get("data"),
-      ...deletedHistoryFlags([config.undoField]),
+      ...getIgnoredFields(document),
       [config.versionField]: oldRecord.id,
     });
 
@@ -248,9 +253,9 @@ export async function redo(document: DocumentSnapshot) {
       toSave[config.versionField] = newRecord.id;
     }
 
-    await document.ref.update({
+    await document.ref.set({
       ...toSave,
-      ...deletedHistoryFlags([config.redoField]),
+      ...getIgnoredFields(document),
     });
 
     logger.log("DONE");

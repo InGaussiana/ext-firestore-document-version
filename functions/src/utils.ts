@@ -102,6 +102,14 @@ export function documentChanged(
   return false;
 }
 
+export function getIgnoredFields(document: DocumentSnapshot) {
+  const data: DocumentData = flattenObject(document.data());
+  const toIgnore = config.ignoreFields.split(",").map((x) => x.trim());
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => toIgnore.includes(key))
+  );
+}
+
 export function getVersionedFields(document: DocumentSnapshot) {
   const data: DocumentData = flattenObject(document.data());
   const toIgnore = config.ignoreFields.split(",").map((x) => x.trim());
