@@ -93,8 +93,9 @@ export function documentChanged(
     return true;
   }
 
-  for (const key in Object.keys(beforeData)) {
-    if (beforeData[key] !== afterData[key]) {
+  for (const key of Object.keys(beforeData)) {
+    // Need jsonstringfy to catch Firebase Timestamps equal operation
+    if (JSON.stringify(beforeData[key]) !== JSON.stringify(afterData[key])) {
       return true;
     }
   }
