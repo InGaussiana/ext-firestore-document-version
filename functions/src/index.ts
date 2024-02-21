@@ -65,7 +65,7 @@ exports.manageDocumentVersions = functions
       (canRedo(data.before) && !canRedo(data.after))
     ) {
       functions.logger.log(
-        `Document (${data.after.ref.path}) update is a CREATE operation, no processing needed. ABORTING!`
+        `Document (${data.after.ref.path}) update is a history operation, no processing needed. ABORTING!`
       );
       return;
     }
