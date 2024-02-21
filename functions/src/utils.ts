@@ -119,14 +119,15 @@ export function getVersionedFields(document: DocumentSnapshot) {
   );
 }
 
-const flattenObject = (obj?: DocumentData, parentKey = "") => {
+export const flattenObject = (obj?: DocumentData, parentKey = "") => {
   if (parentKey !== "") parentKey += ".";
   let flattened: DocumentData = {};
   Object.keys(obj ?? {}).forEach((key) => {
     if (
       typeof obj?.[key] === "object" &&
       obj[key] !== null &&
-      !obj[key].toDate // Avoid flattening Firebase Timestamps
+      !obj[key].toDate && // Avoid flattening Firebase Timestamps
+      Object.prototype.toString.call(obj[key]) !== "[object Date]"
     ) {
       Object.assign(flattened, flattenObject(obj[key], parentKey + key));
     } else {
@@ -135,3 +136,19 @@ const flattenObject = (obj?: DocumentData, parentKey = "") => {
   });
   return flattened;
 };
+
+export function nestObject(document: DocumentData) {
+  return Object.entries(flattenObject(document)).reduce(
+    (acc, [path, value]) => (
+      path
+        .split(".")
+        .reduce(
+          (finalValue, subpath, i, pathArray) =>
+            (finalValue[subpath] ??= i === pathArray.length - 1 ? value : {}),
+          acc as DocumentData
+        ),
+      acc
+    ),
+    {}
+  );
+}

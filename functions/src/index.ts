@@ -12,6 +12,7 @@ import {
   cleanFlags,
   documentChanged,
   getVersionedFields,
+  nestObject,
 } from "./utils";
 import {
   handleDocumentCreation,
@@ -103,10 +104,14 @@ exports.manageDocumentVersions = functions
       await admin
         .firestore()
         .doc(`${getHistoryPathVersion(data.after)}/${context.timestamp}`)
-        .set({
-          data: getVersionedFields(data.before),
-          date: new Date(context.timestamp),
-        });
+        .set(
+          nestObject({
+            data: getVersionedFields(data.before),
+            date: new Date(context.timestamp),
+            test: new Date(context.timestamp),
+            shift: "TEST",
+          })
+        );
 
       functions.logger.log("DONE");
     } catch (error) {
