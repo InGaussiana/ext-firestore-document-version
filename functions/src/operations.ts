@@ -6,13 +6,7 @@ import {
   Query,
   WhereFilterOp,
 } from "firebase-admin/firestore";
-import {
-  enableRestore,
-  gotoField,
-  redoField,
-  undoField,
-  versionField,
-} from "./config";
+import { config } from "./config";
 import {
   isRestoring,
   isHistoryTransaction,
@@ -28,7 +22,7 @@ import { EventContext } from "firebase-functions";
 export async function handleDocumentCreation(document: DocumentSnapshot) {
   logger.log(`Document CREATED (${document.ref.path})`);
 
-  if (enableRestore && isRestoring(document)) {
+  if (config.enableRestore && isRestoring(document)) {
     logger.log(
       `RESTORE operation found on just created document (${document.ref.path})`
     );
@@ -51,7 +45,7 @@ export async function handleDocumentDeletion(
 ) {
   logger.log(`Document DELETED (${after.ref.path})`);
 
-  if (!enableRestore) {
+  if (!config.enableRestore) {
     logger.log(
       `Restore operation disabled: Deleting all history versions of document (${after.ref.path})`
     );
@@ -66,7 +60,7 @@ export async function handleDocumentDeletion(
     logger.log(
       `Redo versions found on deletion. Cleaning unreacheable versions after delete of document (${after.ref.path})`
     );
-    await deleteVersions(after, before.get(versionField), ">=");
+    await deleteVersions(after, before.get(config.versionField), ">=");
   }
 
   logger.log(
@@ -111,23 +105,25 @@ export async function goToVersion(
   try {
     logger.log(
       `Setting (${document.ref.path}) document version to ${document.get(
-        gotoField
+        config.gotoField
       )}`
     );
 
     const versionSnap = await admin
       .firestore()
-      .doc(`${getHistoryPathVersion(document)}/${document.get(gotoField)}`)
+      .doc(
+        `${getHistoryPathVersion(document)}/${document.get(config.gotoField)}`
+      )
       .get();
 
     const versionData = versionSnap?.data();
     if (!versionData) {
       logger.log(
-        `Version ${document.get(gotoField)} of document "${
+        `Version ${document.get(config.gotoField)} of document "${
           document.ref.path
         }" not found. ABORTING!.`
       );
-      await cleanFlags(document, [gotoField]);
+      await cleanFlags(document, [config.gotoField]);
       return;
     }
 
@@ -140,18 +136,18 @@ export async function goToVersion(
     if (versionSnap.get("last")) {
       await versionSnap.ref.delete();
     } else {
-      toSave[versionField] = document.get(gotoField);
+      toSave[config.versionField] = document.get(config.gotoField);
     }
 
     await document.ref.update({
       ...toSave,
-      ...deletedHistoryFlags([gotoField]),
+      ...deletedHistoryFlags([config.gotoField]),
     });
     logger.log("DONE");
   } catch (error) {
     logger.error(
       `ERROR setting (${document.ref.path}) document version to ${document.get(
-        gotoField
+        config.gotoField
       )}`,
       error
     );
@@ -166,7 +162,11 @@ export async function undo(document: DocumentSnapshot, context: EventContext) {
 
   // If actual version can redo
   if (canRedo(document)) {
-    query = query.where("date", "<", new Date(document.get(versionField)));
+    query = query.where(
+      "date",
+      "<",
+      new Date(document.get(config.versionField))
+    );
   }
 
   // Get version before
@@ -178,7 +178,7 @@ export async function undo(document: DocumentSnapshot, context: EventContext) {
     logger.log(
       `Document (${document.ref.path}) don't have older versions to undo. ABORTING`
     );
-    await cleanFlags(document, [undoField]);
+    await cleanFlags(document, [config.undoField]);
     return;
   }
 
@@ -194,8 +194,8 @@ export async function undo(document: DocumentSnapshot, context: EventContext) {
     // Restoring old state and setting the version flag
     await document.ref.update({
       ...oldRecord.get("data"),
-      ...deletedHistoryFlags([undoField]),
-      [versionField]: oldRecord.id,
+      ...deletedHistoryFlags([config.undoField]),
+      [config.versionField]: oldRecord.id,
     });
 
     logger.log("DONE");
@@ -214,7 +214,7 @@ export async function redo(document: DocumentSnapshot) {
     logger.log(
       `Document (${document.ref.path}) don't have new versions to redo. ABORTING`
     );
-    await cleanFlags(document, [redoField, versionField]);
+    await cleanFlags(document, [config.redoField, config.versionField]);
     return;
   }
 
@@ -222,7 +222,7 @@ export async function redo(document: DocumentSnapshot) {
   const next = await admin
     .firestore()
     .collection(getHistoryPathVersion(document))
-    .where("date", ">", new Date(document.get(versionField)))
+    .where("date", ">", new Date(document.get(config.versionField)))
     .orderBy("date", "asc")
     .limit(1)
     .get();
@@ -232,7 +232,7 @@ export async function redo(document: DocumentSnapshot) {
     logger.log(
       `Document (${document.ref.path}) don't have new versions to redo. ABORTING`
     );
-    await cleanFlags(document, [redoField, versionField]);
+    await cleanFlags(document, [config.redoField, config.versionField]);
     return;
   }
 
@@ -245,12 +245,12 @@ export async function redo(document: DocumentSnapshot) {
     if (newRecord.get("last")) {
       await newRecord.ref.delete();
     } else {
-      toSave[versionField] = newRecord.id;
+      toSave[config.versionField] = newRecord.id;
     }
 
     await document.ref.update({
       ...toSave,
-      ...deletedHistoryFlags([redoField]),
+      ...deletedHistoryFlags([config.redoField]),
     });
 
     logger.log("DONE");

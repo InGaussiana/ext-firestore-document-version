@@ -24,9 +24,6 @@ import {
 
 admin.initializeApp();
 
-// TODO flatten
-// TODO save current version with all.
-
 exports.manageDocumentVersions = functions
   .runWith({ failurePolicy: true })
   .firestore.document(config.collectionName)
