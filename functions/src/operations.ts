@@ -5,6 +5,7 @@ import {
   DocumentSnapshot,
   Query,
   WhereFilterOp,
+  FieldValue,
 } from "firebase-admin/firestore";
 import { config } from "./config";
 import {
@@ -73,7 +74,11 @@ export async function handleDocumentDeletion(
     .firestore()
     .doc(getHistoryPath(after))
     .set(
-      { ...before.data(), ...deletedHistoryFlags() },
+      {
+        ...before.data(),
+        ...deletedHistoryFlags(),
+        updated_at: FieldValue.serverTimestamp(),
+      },
       // Need merge to enable deletion of flags
       { merge: true }
     );
